@@ -18,13 +18,16 @@ class JupyterError:
         }
 
     def result(self):
-        result = self.error_content + {
+        result = {
             'execution_count': self.kernel.execution_count,
             'status': 'error',
         }
+        result.update(self.error_content)
+        return result
 
     def send_response(self):
-        self.kernel.send_response(self.kernel.iopub_socket, 'error', self.error_content)
+        self.kernel.send_response(self.kernel.iopub_socket, 'error',
+                                  self.error_content)
 
 
 class JupyterKernel(Kernel):
