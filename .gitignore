@@ -4,3 +4,4 @@ __pycache__
 *.egg-info
 src/.ipynb_checkpoints
 /setup.py
+/README.html
