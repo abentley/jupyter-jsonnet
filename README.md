@@ -2,7 +2,7 @@ Jupyter-Jsonnet
 ===============
 
 This package provides a Jupyter Kernel to support the Jsonnet language.  It is
-based on the official Jsonnet language bindings.
+based on the official Jsonnet Python bindings.
 
 After installing it, you need to register it to Jupyter with the command:
 ```sh
