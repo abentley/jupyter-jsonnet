@@ -52,7 +52,7 @@ class JupyterKernel(Kernel):
         try:
             statements_end = code.rindex(';') + 1
         except ValueError:
-            statements_end = len(code)
+            statements_end = 0
         statements = code[:statements_end]
         result = code[statements_end:]
         result = None if result.strip() == '' else result

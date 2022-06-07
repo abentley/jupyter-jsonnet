@@ -22,7 +22,11 @@ class TestJupyterKernel(TestCase):
 
         self.assertEqual(
             JupyterKernel.split_code('   '),
-            ('   ', None))
+            ('', None))
+
+        self.assertEqual(
+            JupyterKernel.split_code('{}'),
+            ('', '{}'))
 
 
 if __name__ == '__main__':
