@@ -5,5 +5,5 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jupyter-jsonnet"
 description = "A simple Jsonnet kernel for Jupyter"
-dependencies = ["ipykernel", "jsonnet", "jupyter_client"]
+dependencies = ["ipykernel", "jsonnet", "jupyter_client", "notebook"]
 version = "0.1"

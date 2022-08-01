@@ -19,3 +19,14 @@ This kernel extends jsonnet syntax slightly to permit
 The parsing to separate statements from expressions is very simple, and can
 easily be fooled by semicolons that do not terminate statements, like in
 comments or strings.
+
+Building from Source
+====================
+Ensure PyPA `build` is installed:
+
+```sh
+pip3 install build
+python3 -m build
+```
+
+I don't currently have a satisfactory way of doing "develop" installs.
