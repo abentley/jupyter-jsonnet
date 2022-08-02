@@ -1,3 +1,7 @@
+# Copyright Aaron Bentley 2022
+# This software is licenced under the MIT license
+# <LICENSE or http://opensource.org/licenses/MIT>
+
 from dataclasses import dataclass
 import json
 
