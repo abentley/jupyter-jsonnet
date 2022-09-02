@@ -4,6 +4,7 @@
 
 from dataclasses import dataclass
 import json
+from importlib import metadata
 
 from ipykernel.kernelbase import Kernel
 from _jsonnet import evaluate_snippet
@@ -19,7 +20,7 @@ class JupyterError:
         return {
             'ename': 'RuntimeError',
             'evalue': str(self.exception),
-            'traceback': [str(self.exception).splitlines()]
+            'traceback': str(self.exception).splitlines()
         }
 
     def result(self):
@@ -43,13 +44,30 @@ class JupyterKernel(Kernel):
 
     language = "Jsonnet"
 
-    language_version = "1.0"
-    language_info = {'mimetype': 'text/plain', 'name': 'Jsonnet'}
+    language_version = metadata.version('jsonnet')
+    language_info = {
+        'name': 'Jsonnet',
+        'mimetype': 'text/x-jsonnet',
+        'file_extension': 'jsonnet',
+    }
     banner = "Welcome to Jsonnet!"
+
+    class ShellHandlers:
+
+        def comm_open(stream, ident, parent):
+            # ignore unknown message
+            pass
+
+        def comm_msg(stream, ident, parent):
+            # ignore unknown message
+            pass
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.history = ''
+        self.shell_handlers.update({
+            k: getattr(self.ShellHandlers, k) for k in dir(self.ShellHandlers)
+        })
 
     @staticmethod
     def split_code(code):
