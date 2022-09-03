@@ -47,6 +47,7 @@ class JupyterException(RuntimeError):
         if sections is None:
             return str(self)
         groups = list(sections.groups())
+        groups[6] = str(int(groups[6]) + row_offset)
         groups[10] = str(int(groups[10]) + column_offset)
         if groups[12] is not None:
             groups[12] = str(int(groups[12]) + column_offset)

@@ -93,6 +93,12 @@ class TestJupyterException(TestCase):
             ).rewrite(0, -9),
             'STATIC ERROR: 1:3-15: Unknown variable: y\n',
         )
+        self.assertEqual(
+            JupyterException.from_str(
+                'STATIC ERROR: 5:12-24: Unknown variable: y\n'
+            ).rewrite(-3, -9),
+            'STATIC ERROR: 2:3-15: Unknown variable: y\n',
+        )
 
 
 if __name__ == '__main__':
