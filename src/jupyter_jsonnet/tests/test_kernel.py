@@ -5,35 +5,35 @@ from unittest import (
 
 from jupyter_jsonnet.kernel import (
     JupyterError,
-    JupyterExecutor,
+    JsonnetExecutor,
 )
 
 
-class TestJupyterExecutor(TestCase):
+class TestJsonnetExecutor(TestCase):
 
     def test_split_code(self):
         self.assertEqual(
-            JupyterExecutor.split_code(";"),
+            JsonnetExecutor.split_code(";"),
             (';', None))
 
         self.assertEqual(
-            JupyterExecutor.split_code("  ; "),
+            JsonnetExecutor.split_code("  ; "),
             ('  ;', None))
 
         self.assertEqual(
-            JupyterExecutor.split_code("foo; bar"),
+            JsonnetExecutor.split_code("foo; bar"),
             ('foo;', ' bar'))
 
         self.assertEqual(
-            JupyterExecutor.split_code('   '),
+            JsonnetExecutor.split_code('   '),
             ('', None))
 
         self.assertEqual(
-            JupyterExecutor.split_code('{}'),
+            JsonnetExecutor.split_code('{}'),
             ('', '{}'))
 
     def test_get_offsets(self):
-        executor = JupyterExecutor(None)
+        executor = JsonnetExecutor(None)
         self.assertEqual(executor.get_current_offsets(), (0, 0))
         executor.history += 'local x=5;'
         self.assertEqual(executor.get_current_offsets(), (0, 10))

@@ -76,8 +76,11 @@ class JupyterError(RuntimeError):
         return error_content, result
 
 
-class JupyterExecutor:
-    """An executor for jsonnet that preserves past statements as history"""
+class JsonnetExecutor:
+    """An executor for Jsonnet that preserves past statements as history.
+
+    This is concerned with Jsonnet and has no knowledge of Jupyter.
+    """
 
     def __init__(self, stdout_callback):
         self.stdout_callback = stdout_callback
@@ -177,31 +180,36 @@ class JupyterKernel(Kernel):
         self.shell_handlers.update({
             k: getattr(self.ShellHandlers, k) for k in dir(self.ShellHandlers)
         })
-        self.executor = JupyterExecutor(self.send_output_response)
+        self.executor = JsonnetExecutor(self.send_output_response)
 
     def send_error_response(self, error_content):
         self.send_response(self.iopub_socket, 'error',
                            error_content)
 
     def send_output_response(self, output):
+        """Write the supplied output to the output stream.
+
+        Used primarily as a callback.  Might make sense as a send generator.
+        """
         stream_content = {'name': 'stdout', 'text': output}
         self.send_response(self.iopub_socket, 'stream', stream_content)
 
     def do_execute(self, code, silent, store_history, user_expressions,
                    allow_stdin):
+        """Execute the supplied code and communicate the outcome."""
         try:
             self.executor.execute(code, silent)
         except JupyterError as e:
             error_content, result = e.to_jupyter(self)
-            self.send_error_response(error_content)
+            self.send_response(self.iopub_socket, 'error',
+                               error_content)
             return result
-        else:
-            return {
-                'status': 'ok',
-                'execution_count': self.execution_count,
-                'payload': [],
-                'user_expressions': {},
-            }
+        return {
+            'status': 'ok',
+            'execution_count': self.execution_count,
+            'payload': [],
+            'user_expressions': {},
+        }
 
 
 if __name__ == '__main__':
