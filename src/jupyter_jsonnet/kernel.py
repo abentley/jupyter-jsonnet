@@ -2,6 +2,7 @@
 # This software is licenced under the MIT license
 # <LICENSE or http://opensource.org/licenses/MIT>
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 import json
 from importlib import metadata
@@ -9,6 +10,45 @@ import re
 
 from ipykernel.kernelbase import Kernel
 from _jsonnet import evaluate_snippet
+
+
+class JupyterException(RuntimeError):
+
+    def __init__(self, real):
+        self._real = real
+
+    @classmethod
+    def from_str(cls, str):
+        return cls(RuntimeError(str))
+
+    @property
+    def args():
+        return self._real.args
+
+    @classmethod
+    @contextmanager
+    def reraise(cls):
+        try:
+            yield
+        except RuntimeError as e:
+            raise cls(e) from e
+
+    def parse(self):
+        return re.match(
+            r'^(?P<type>[^:]+)'
+            r'(: )(?:(?P<msg1>.*)(\n\t))?'
+            r'(?:([^:]+)(:))?(?P<start_row>\d+)(q)?(q)?(:)(?P<start_col>\d+)(-)?(\d+)?'
+            r'(: |\t?)(?:(?P<msg2>.+))?(\n)$',
+            str(self),
+        )
+
+    def rewrite(self, row_offset, column_offset):
+        sections = self.parse()
+        if sections == None:
+            return str(self)
+        groups = list(sections.groups())
+        groups[10] = str(int(groups[10]) + column_offset)
+        return ''.join(g for g in groups if g is not None)
 
 
 @dataclass
@@ -82,31 +122,14 @@ class JupyterKernel(Kernel):
         result = None if result.strip() == '' else result
         return statements, result
 
-    @staticmethod
-    def parse_error(error):
-        return re.match(
-            r'^(?P<type>[^:]+)'
-            r'(: )(?:(?P<msg1>.*)(\n\t))?'
-            r'(?:([^:]+)(:))?(?P<start_row>\d+)(q)?(q)?(:)(?P<start_col>\d+)(-)?(\d+)?'
-            r'(: |\t?)(?:(?P<msg2>.+))?(\n)$',
-            error,
-        )
-
-    @classmethod
-    def rewrite_error(cls, error, row_offset, column_offset):
-        sections = cls.parse_error(error)
-        if sections == None:
-            return error
-        groups = list(sections.groups())
-        groups[10] = str(int(groups[10]) - column_offset)
-        return ''.join(g for g in groups if g is not None)
-
     def inner_execute(self, code):
         new_code = self.history + code
         statements, result = self.split_code(new_code)
         if result is None:
             new_code += 'null'
-        return evaluate_snippet('', new_code), statements, result
+        with JupyterException.reraise():
+            out = evaluate_snippet('', new_code)
+        return out, statements, result
 
     def do_execute(self, code, silent, store_history, user_expressions,
                    allow_stdin):
@@ -137,8 +160,8 @@ class JupyterKernel(Kernel):
         """Find current line/col offsets by forcing an error"""
         try:
             self.inner_execute("error 'foo'")
-        except RuntimeError as e:
-            groups = self.parse_error(str(e))
+        except JupyterException as e:
+            groups = e.parse()
         else:
             raise AssertionError('inner_execute failed to raise an exception.')
         if groups is None or groups.group('type') != 'RUNTIME ERROR':
