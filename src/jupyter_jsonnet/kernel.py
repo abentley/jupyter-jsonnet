@@ -24,7 +24,12 @@ class JupyterError(RuntimeError):
         return self._real.args
 
     def parse(self):
-        return re.match(
+        """Parse the error message such that various pieces are separated
+
+        Returns a re.Match object whose groups are contiguous and contain
+        either strings or None.  Also the pattern's groupindex.
+        """
+        pattern = re.compile(
             r'^(?P<type>[^:]+)'
             r'(: )(?:(?P<msg1>(?:.|\n)*)(\n\t))?'
             r'(?:(?P<filename>[^:]+)(:))?'
@@ -32,24 +37,25 @@ class JupyterError(RuntimeError):
             r'(:)(?P<start_col>\d+)'
             r'(\)?-)?(?:(\()(?P<end_row>\d+)(:))?(?P<end_column>\d+)?(\)?)'
             r'(: |\t?)(?:(?P<msg2>.+))?(\n)$',
-            str(self),
         )
+        return pattern.match(str(self)), pattern.groupindex
 
     def rewrite(self, row_offset, column_offset):
-        sections = self.parse()
+        sections, groupindex = self.parse()
         if sections is None:
             return str(self)
         groups = list(sections.groups())
 
-        def do_offset(idx, offset):
+        def do_offset(gname, offset):
+            idx = groupindex[gname] - 1
             if groups[idx] is not None:
                 groups[idx] = str(int(groups[idx]) + offset)
                 return True
             return False
-        do_offset(7, row_offset)
-        do_offset(9, column_offset)
-        if not do_offset(12, row_offset):
-            do_offset(14, column_offset)
+        do_offset('start_row', row_offset)
+        do_offset('start_col', column_offset)
+        if not do_offset('end_row', row_offset):
+            do_offset('end_column', column_offset)
         return ''.join(g for g in groups if g is not None)
 
     def with_offsets(self, row, column):
@@ -128,7 +134,7 @@ class JupyterExecutor:
         try:
             self._execute("error 'foo'")
         except JupyterError as e:
-            groups = e.parse()
+            groups, _ = e.parse()
         else:
             raise AssertionError('execute failed to raise an exception.')
         if groups is None or groups.group('type') != 'RUNTIME ERROR':

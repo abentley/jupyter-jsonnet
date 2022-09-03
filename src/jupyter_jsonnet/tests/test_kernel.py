@@ -51,7 +51,7 @@ class TestJupyterError(TestCase):
     def test_parse(self):
         result = JupyterError.from_str(
             'RUNTIME ERROR: hunting the snark\n\tfoo.c:2:12-37\t\n'
-        ).parse()
+        ).parse()[0]
         self.assertEqual((
             'RUNTIME ERROR', ': ', 'hunting the snark', '\n\t',
             'foo.c', ':', '', '2', ':', '12', '-', None, None, None, '37',
@@ -61,7 +61,7 @@ class TestJupyterError(TestCase):
     def test_parse_syntax(self):
         result = JupyterError.from_str(
             'STATIC ERROR: 1:1: Unknown variable: y\n'
-        ).parse()
+        ).parse()[0]
         self.assertEqual((
             'STATIC ERROR', ': ', None, None, None, None, '',
             '1', ':', '1', None, None, None, None, None, '',
@@ -71,7 +71,7 @@ class TestJupyterError(TestCase):
     def test_parse_multiline(self):
         result = JupyterError.from_str(
             'RUNTIME ERROR: hello\nworld\n\t(1:1)-(2:7)\t\n'
-        ).parse()
+        ).parse()[0]
         self.assertEqual((
             'RUNTIME ERROR', ': ', 'hello\nworld', '\n\t',
             None, None, '(', '1', ':', '1', ')-', '(', '2', ':', '7',

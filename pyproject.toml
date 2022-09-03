@@ -15,3 +15,8 @@ classifiers = [
 ]
 dependencies = ["ipykernel", "jsonnet", "jupyter_client", "notebook"]
 version = "0.3"
+authors = [
+    {email = "aaron@aaronbentley.com", name = "Aaron Bentley"},
+]
+[project.urls]
+repository = "https://github.com/abentley/jupyter-jsonnet"

@@ -29,4 +29,4 @@ pip3 install build
 python3 -m build
 ```
 
-I don't currently have a satisfactory way of doing "develop" installs.
+I don't currently have a satisfactory way of doing develop/editable installs.
