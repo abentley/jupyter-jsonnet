@@ -6,7 +6,6 @@ from unittest import (
 from jupyter_jsonnet.kernel import (
     JupyterError,
     JupyterExecutor,
-    JupyterKernel,
 )
 
 

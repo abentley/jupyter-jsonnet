@@ -2,8 +2,6 @@
 # This software is licenced under the MIT license
 # <LICENSE or http://opensource.org/licenses/MIT>
 
-from contextlib import contextmanager
-from dataclasses import dataclass
 import json
 from importlib import metadata
 import re
@@ -16,10 +14,6 @@ class JupyterError(RuntimeError):
 
     def __init__(self, real):
         self._real = real
-
-    @classmethod
-    def from_str(cls, str):
-        return cls(RuntimeError(str))
 
     @classmethod
     def from_str(cls, str):
@@ -182,6 +176,7 @@ class JupyterKernel(Kernel):
     def send_error_response(self, error_content):
         self.send_response(self.iopub_socket, 'error',
                            error_content)
+
     def send_output_response(self, output):
         stream_content = {'name': 'stdout', 'text': output}
         self.send_response(self.iopub_socket, 'stream', stream_content)
@@ -201,6 +196,7 @@ class JupyterKernel(Kernel):
                 'payload': [],
                 'user_expressions': {},
             }
+
 
 if __name__ == '__main__':
     from ipykernel.kernelapp import IPKernelApp
