@@ -67,12 +67,12 @@ class JupyterException(RuntimeError):
 class JupyterError:
 
     exception: None
-    kernel: None
+    execution_count: None
 
     @classmethod
     def with_offsets(cls, error, kernel, row, column):
         new_error = JupyterException.from_str(error.rewrite(-row, -column))
-        return cls(new_error, kernel)
+        return cls(new_error, kernel.execution_count)
 
     @property
     def error_content(self):
@@ -84,15 +84,12 @@ class JupyterError:
 
     def result(self):
         result = {
-            'execution_count': self.kernel.execution_count,
+            'execution_count': self.execution_count,
             'status': 'error',
         }
         result.update(self.error_content)
         return result
 
-    def send_response(self):
-        self.kernel.send_response(self.kernel.iopub_socket, 'error',
-                                  self.error_content)
 
 
 class JupyterKernel(Kernel):
@@ -148,6 +145,9 @@ class JupyterKernel(Kernel):
             out = evaluate_snippet('', new_code)
         return out, statements, result
 
+    def send_error_response(self, error):
+        self.send_response(self.iopub_socket, 'error',
+                           error.error_content)
     def do_execute(self, code, silent, store_history, user_expressions,
                    allow_stdin):
         try:
@@ -160,7 +160,7 @@ class JupyterKernel(Kernel):
         except JupyterException as e:
             row, column = self.get_current_offsets()
             jp_err = JupyterError.with_offsets(e, self, row, column)
-            jp_err.send_response()
+            self.send_error_response(jp_err)
             return jp_err.result()
         else:
             if not silent:
