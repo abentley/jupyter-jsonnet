@@ -14,4 +14,4 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = ["ipykernel", "jsonnet", "jupyter_client", "notebook"]
-version = "0.2"
+version = "0.3"

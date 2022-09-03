@@ -150,7 +150,7 @@ class JupyterKernel(Kernel):
 
     implementation = "jupyter-jsonnet"
 
-    implementation_version = "0.2"
+    implementation_version = "0.3"
 
     language = "Jsonnet"
 
