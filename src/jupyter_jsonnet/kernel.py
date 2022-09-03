@@ -59,6 +59,7 @@ class JupyterError(RuntimeError):
         return ''.join(g for g in groups if g is not None)
 
     def with_offsets(self, row, column):
+        """Return a version of this error with the row_colmn text adjusted."""
         return JupyterError.from_str(self.rewrite(row, column))
 
     def to_jupyter(self, kernel):
@@ -76,12 +77,15 @@ class JupyterError(RuntimeError):
 
 
 class JupyterExecutor:
+    """An executor for jsonnet that preserves past statements as history"""
 
-    def __init__(self):
+    def __init__(self, stdout_callback):
+        self.stdout_callback = stdout_callback
         self.history = ''
 
     @staticmethod
     def split_code(code):
+        """Split top-level statements from top-level expression."""
         try:
             statements_end = code.rindex(';') + 1
         except ValueError:
@@ -91,7 +95,8 @@ class JupyterExecutor:
         result = None if result.strip() == '' else result
         return statements, result
 
-    def execute(self, code, rewrite_error=True):
+    def _execute(self, code):
+        """Execute method that does not update history or write output."""
         new_code = self.history + code
         statements, result = self.split_code(new_code)
         if result is None:
@@ -99,17 +104,35 @@ class JupyterExecutor:
         try:
             out = evaluate_snippet('', new_code)
         except RuntimeError as e:
-            jupyter_err = JupyterError(e)
-            if rewrite_error:
-                row, column = self.get_current_offsets()
-                jupyter_err = jupyter_err.with_offsets(-row, -column)
-            raise jupyter_err from e
-        return out, statements, result
+            raise JupyterError(e) from e
+        if result is None:
+            if json.loads(out) is None:
+                out = ''
+            else:
+                raise ValueError('Bad input')
+        return out, statements
+
+    def execute(self, code, silent):
+        """Execute code
+
+        On success, history will be updated.
+        On error, the error is rewritten to fix the line/column text, as if
+        none of the history had been there.
+        If silent is true, no output is written.
+        """
+        try:
+            out, statements = self._execute(code)
+        except JupyterError as e:
+            row, column = self.get_current_offsets()
+            raise e.with_offsets(-row, -column) from e
+        if not silent:
+            self.stdout_callback(out)
+        self.history = statements
 
     def get_current_offsets(self):
         """Find current line/col offsets by forcing an error"""
         try:
-            self.execute("error 'foo'", rewrite_error=False)
+            self._execute("error 'foo'")
         except JupyterError as e:
             groups = e.parse()
         else:
@@ -154,30 +177,24 @@ class JupyterKernel(Kernel):
         self.shell_handlers.update({
             k: getattr(self.ShellHandlers, k) for k in dir(self.ShellHandlers)
         })
-        self.executor = JupyterExecutor()
+        self.executor = JupyterExecutor(self.send_output_response)
 
     def send_error_response(self, error_content):
         self.send_response(self.iopub_socket, 'error',
                            error_content)
+    def send_output_response(self, output):
+        stream_content = {'name': 'stdout', 'text': output}
+        self.send_response(self.iopub_socket, 'stream', stream_content)
 
     def do_execute(self, code, silent, store_history, user_expressions,
                    allow_stdin):
         try:
-            output, statements, result = self.executor.execute(code)
-            if result is None:
-                if json.loads(output) is None:
-                    output = ''
-                else:
-                    raise ValueError('Bad input')
+            self.executor.execute(code, silent)
         except JupyterError as e:
             error_content, result = e.to_jupyter(self)
             self.send_error_response(error_content)
             return result
         else:
-            if not silent:
-                stream_content = {'name': 'stdout', 'text': output}
-                self.send_response(self.iopub_socket, 'stream', stream_content)
-            self.executor.history = statements
             return {
                 'status': 'ok',
                 'execution_count': self.execution_count,

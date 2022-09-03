@@ -34,7 +34,7 @@ class TestJupyterExecutor(TestCase):
             ('', '{}'))
 
     def test_get_offsets(self):
-        executor = JupyterExecutor()
+        executor = JupyterExecutor(None)
         self.assertEqual(executor.get_current_offsets(), (0, 0))
         executor.history += 'local x=5;'
         self.assertEqual(executor.get_current_offsets(), (0, 10))
@@ -48,12 +48,6 @@ class TestJupyterError(TestCase):
         orig = RuntimeError('STATIC ERROR: 1:1: Unknown variable: y\n')
         jupyter = JupyterError(orig)
         self.assertEqual(str(jupyter), str(orig))
-
-    def test_reraise(self):
-        with self.assertRaisesRegex(
-                JupyterError, 'STATIC ERROR: 1:1: Unknown variable: y\n'):
-            with JupyterError.reraise():
-                raise RuntimeError('STATIC ERROR: 1:1: Unknown variable: y\n')
 
     def test_parse(self):
         result = JupyterError.from_str(
