@@ -21,17 +21,13 @@ class JupyterError(RuntimeError):
     def from_str(cls, str):
         return cls(RuntimeError(str))
 
+    @classmethod
+    def from_str(cls, str):
+        return cls(RuntimeError(str))
+
     @property
     def args(self):
         return self._real.args
-
-    @classmethod
-    @contextmanager
-    def reraise(cls):
-        try:
-            yield
-        except RuntimeError as e:
-            raise cls(e) from e
 
     def parse(self):
         return re.match(
@@ -62,8 +58,10 @@ class JupyterError(RuntimeError):
             do_offset(14, column_offset)
         return ''.join(g for g in groups if g is not None)
 
-    def to_jupyter(self, kernel, row, column):
-        new_error = JupyterError.from_str(self.rewrite(-row, -column))
+    def with_offsets(self, row, column):
+        return JupyterError.from_str(self.rewrite(row, column))
+
+    def to_jupyter(self, kernel):
         error_content = {
             'ename': 'RuntimeError',
             'evalue': str(self),
@@ -75,6 +73,54 @@ class JupyterError(RuntimeError):
         }
         result.update(error_content)
         return error_content, result
+
+
+class JupyterExecutor:
+
+    def __init__(self):
+        self.history = ''
+
+    @staticmethod
+    def split_code(code):
+        try:
+            statements_end = code.rindex(';') + 1
+        except ValueError:
+            statements_end = 0
+        statements = code[:statements_end]
+        result = code[statements_end:]
+        result = None if result.strip() == '' else result
+        return statements, result
+
+    def execute(self, code, rewrite_error=True):
+        new_code = self.history + code
+        statements, result = self.split_code(new_code)
+        if result is None:
+            new_code += 'null'
+        try:
+            out = evaluate_snippet('', new_code)
+        except RuntimeError as e:
+            jupyter_err = JupyterError(e)
+            if rewrite_error:
+                row, column = self.get_current_offsets()
+                jupyter_err = jupyter_err.with_offsets(-row, -column)
+            raise jupyter_err from e
+        return out, statements, result
+
+    def get_current_offsets(self):
+        """Find current line/col offsets by forcing an error"""
+        try:
+            self.execute("error 'foo'", rewrite_error=False)
+        except JupyterError as e:
+            groups = e.parse()
+        else:
+            raise AssertionError('execute failed to raise an exception.')
+        if groups is None or groups.group('type') != 'RUNTIME ERROR':
+            raise
+        if groups.group('msg1') != 'foo':
+            raise
+        row_offset = int(groups.group('start_row')) - 1
+        col_offset = int(groups.group('start_col')) - 1
+        return row_offset, col_offset
 
 
 class JupyterKernel(Kernel):
@@ -105,30 +151,10 @@ class JupyterKernel(Kernel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.history = ''
         self.shell_handlers.update({
             k: getattr(self.ShellHandlers, k) for k in dir(self.ShellHandlers)
         })
-
-    @staticmethod
-    def split_code(code):
-        try:
-            statements_end = code.rindex(';') + 1
-        except ValueError:
-            statements_end = 0
-        statements = code[:statements_end]
-        result = code[statements_end:]
-        result = None if result.strip() == '' else result
-        return statements, result
-
-    def inner_execute(self, code):
-        new_code = self.history + code
-        statements, result = self.split_code(new_code)
-        if result is None:
-            new_code += 'null'
-        with JupyterError.reraise():
-            out = evaluate_snippet('', new_code)
-        return out, statements, result
+        self.executor = JupyterExecutor()
 
     def send_error_response(self, error_content):
         self.send_response(self.iopub_socket, 'error',
@@ -137,45 +163,27 @@ class JupyterKernel(Kernel):
     def do_execute(self, code, silent, store_history, user_expressions,
                    allow_stdin):
         try:
-            output, statements, result = self.inner_execute(code)
+            output, statements, result = self.executor.execute(code)
             if result is None:
                 if json.loads(output) is None:
                     output = ''
                 else:
                     raise ValueError('Bad input')
         except JupyterError as e:
-            row, column = self.get_current_offsets()
-            error_content, result = e.to_jupyter(self, row, column)
+            error_content, result = e.to_jupyter(self)
             self.send_error_response(error_content)
             return result
         else:
             if not silent:
                 stream_content = {'name': 'stdout', 'text': output}
                 self.send_response(self.iopub_socket, 'stream', stream_content)
-            self.history = statements
+            self.executor.history = statements
             return {
                 'status': 'ok',
                 'execution_count': self.execution_count,
                 'payload': [],
                 'user_expressions': {},
             }
-
-    def get_current_offsets(self):
-        """Find current line/col offsets by forcing an error"""
-        try:
-            self.inner_execute("error 'foo'")
-        except JupyterError as e:
-            groups = e.parse()
-        else:
-            raise AssertionError('inner_execute failed to raise an exception.')
-        if groups is None or groups.group('type') != 'RUNTIME ERROR':
-            raise
-        if groups.group('msg1') != 'foo':
-            raise
-        row_offset = int(groups.group('start_row')) - 1
-        col_offset = int(groups.group('start_col')) - 1
-        return row_offset, col_offset
-
 
 if __name__ == '__main__':
     from ipykernel.kernelapp import IPKernelApp

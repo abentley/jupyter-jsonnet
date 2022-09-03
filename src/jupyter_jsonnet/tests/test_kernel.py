@@ -5,40 +5,41 @@ from unittest import (
 
 from jupyter_jsonnet.kernel import (
     JupyterError,
+    JupyterExecutor,
     JupyterKernel,
 )
 
 
-class TestJupyterKernel(TestCase):
+class TestJupyterExecutor(TestCase):
 
     def test_split_code(self):
         self.assertEqual(
-            JupyterKernel.split_code(";"),
+            JupyterExecutor.split_code(";"),
             (';', None))
 
         self.assertEqual(
-            JupyterKernel.split_code("  ; "),
+            JupyterExecutor.split_code("  ; "),
             ('  ;', None))
 
         self.assertEqual(
-            JupyterKernel.split_code("foo; bar"),
+            JupyterExecutor.split_code("foo; bar"),
             ('foo;', ' bar'))
 
         self.assertEqual(
-            JupyterKernel.split_code('   '),
+            JupyterExecutor.split_code('   '),
             ('', None))
 
         self.assertEqual(
-            JupyterKernel.split_code('{}'),
+            JupyterExecutor.split_code('{}'),
             ('', '{}'))
 
     def test_get_offsets(self):
-        kernel = JupyterKernel()
-        self.assertEqual(kernel.get_current_offsets(), (0, 0))
-        kernel.history += 'local x=5;'
-        self.assertEqual(kernel.get_current_offsets(), (0, 10))
-        kernel.history += '\n'
-        self.assertEqual(kernel.get_current_offsets(), (1, 0))
+        executor = JupyterExecutor()
+        self.assertEqual(executor.get_current_offsets(), (0, 0))
+        executor.history += 'local x=5;'
+        self.assertEqual(executor.get_current_offsets(), (0, 10))
+        executor.history += '\n'
+        self.assertEqual(executor.get_current_offsets(), (1, 0))
 
 
 class TestJupyterError(TestCase):
