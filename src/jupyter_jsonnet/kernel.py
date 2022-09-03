@@ -44,10 +44,12 @@ class JupyterException(RuntimeError):
 
     def rewrite(self, row_offset, column_offset):
         sections = self.parse()
-        if sections == None:
+        if sections is None:
             return str(self)
         groups = list(sections.groups())
         groups[10] = str(int(groups[10]) + column_offset)
+        if groups[12] is not None:
+            groups[12] = str(int(groups[12]) + column_offset)
         return ''.join(g for g in groups if g is not None)
 
 
