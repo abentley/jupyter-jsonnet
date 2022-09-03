@@ -57,6 +57,11 @@ class JupyterError:
     exception: None
     kernel: None
 
+    @classmethod
+    def with_offsets(cls, error, kernel, row, column):
+        new_error = JupyterException.from_str(error.rewrite(-row, -column))
+        return cls(new_error, kernel)
+
     @property
     def error_content(self):
         return {
@@ -140,8 +145,9 @@ class JupyterKernel(Kernel):
                     output = ''
                 else:
                     raise ValueError('Bad input')
-        except RuntimeError as e:
-            jp_err = JupyterError(e, self)
+        except JupyterException as e:
+            row, column = self.get_current_offsets()
+            jp_err = JupyterError.with_offsets(e, self, row, column)
             jp_err.send_response()
             return jp_err.result()
         else:
