@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jupyter-jsonnet"
 description = "A simple Jsonnet kernel for Jupyter"
-readme = "README.rst"
+readme = "README.md"
 license = {text = 'MIT'}
 classifiers = [
     "Framework :: Jupyter",
@@ -14,4 +14,4 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = ["ipykernel", "jsonnet", "jupyter_client", "notebook"]
-version = "0.1"
+version = "0.2"
