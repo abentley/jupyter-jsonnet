@@ -22,7 +22,7 @@ class JupyterException(RuntimeError):
         return cls(RuntimeError(str))
 
     @property
-    def args():
+    def args(self):
         return self._real.args
 
     @classmethod
@@ -36,8 +36,11 @@ class JupyterException(RuntimeError):
     def parse(self):
         return re.match(
             r'^(?P<type>[^:]+)'
-            r'(: )(?:(?P<msg1>.*)(\n\t))?'
-            r'(?:([^:]+)(:))?(?P<start_row>\d+)(q)?(q)?(:)(?P<start_col>\d+)(-)?(\d+)?'
+            r'(: )(?:(?P<msg1>(?:.|\n)*)(\n\t))?'
+            r'(?:(?P<filename>[^:]+)(:))?'
+            r'(\(?)(?P<start_row>\d+)'
+            r'(:)(?P<start_col>\d+)'
+            r'(\)?-)?(?:(\()(?P<end_row>\d+)(:))?(?P<end_column>\d+)?(\)?)'
             r'(: |\t?)(?:(?P<msg2>.+))?(\n)$',
             str(self),
         )
@@ -47,10 +50,16 @@ class JupyterException(RuntimeError):
         if sections is None:
             return str(self)
         groups = list(sections.groups())
-        groups[6] = str(int(groups[6]) + row_offset)
-        groups[10] = str(int(groups[10]) + column_offset)
-        if groups[12] is not None:
-            groups[12] = str(int(groups[12]) + column_offset)
+
+        def do_offset(idx, offset):
+            if groups[idx] is not None:
+                groups[idx] = str(int(groups[idx]) + offset)
+                return True
+            return False
+        do_offset(7, row_offset)
+        do_offset(9, column_offset)
+        if not do_offset(12, row_offset):
+            do_offset(14, column_offset)
         return ''.join(g for g in groups if g is not None)
 
 

@@ -49,8 +49,8 @@ class TestJupyterException(TestCase):
         self.assertEqual(str(jupyter), str(orig))
 
     def test_reraise(self):
-        with self.assertRaisesRegex(JupyterException,
-                                    'STATIC ERROR: 1:1: Unknown variable: y\n'):
+        with self.assertRaisesRegex(
+                JupyterException, 'STATIC ERROR: 1:1: Unknown variable: y\n'):
             with JupyterException.reraise():
                 raise RuntimeError('STATIC ERROR: 1:1: Unknown variable: y\n')
 
@@ -60,8 +60,8 @@ class TestJupyterException(TestCase):
         ).parse()
         self.assertEqual((
             'RUNTIME ERROR', ': ', 'hunting the snark', '\n\t',
-            'foo.c', ':', '2', None, None, ':', '12', '-', '37',
-            '\t', None, '\n'
+            'foo.c', ':', '', '2', ':', '12', '-', None, None, None, '37',
+            '', '\t', None, '\n'
         ), result.groups())
 
     def test_parse_syntax(self):
@@ -69,9 +69,19 @@ class TestJupyterException(TestCase):
             'STATIC ERROR: 1:1: Unknown variable: y\n'
         ).parse()
         self.assertEqual((
-            'STATIC ERROR', ': ', None, None, None, None,
-            '1', None, None, ':', '1', None, None,
+            'STATIC ERROR', ': ', None, None, None, None, '',
+            '1', ':', '1', None, None, None, None, None, '',
             ': ', 'Unknown variable: y', '\n'
+        ), result.groups())
+
+    def test_parse_multiline(self):
+        result = JupyterException.from_str(
+            'RUNTIME ERROR: hello\nworld\n\t(1:1)-(2:7)\t\n'
+        ).parse()
+        self.assertEqual((
+            'RUNTIME ERROR', ': ', 'hello\nworld', '\n\t',
+            None, None, '(', '1', ':', '1', ')-', '(', '2', ':', '7',
+            ')', '\t', None, '\n'
         ), result.groups())
 
     def test_rewrite(self):
@@ -98,6 +108,14 @@ class TestJupyterException(TestCase):
                 'STATIC ERROR: 5:12-24: Unknown variable: y\n'
             ).rewrite(-3, -9),
             'STATIC ERROR: 2:3-15: Unknown variable: y\n',
+        )
+
+    def test_rewrite_multiline(self):
+        self.assertEqual(
+            JupyterException.from_str(
+                'RUNTIME ERROR: hello\nworld\n\t(5:10)-(6:7)\t\n'
+            ).rewrite(-3, -9),
+            'RUNTIME ERROR: hello\nworld\n\t(2:1)-(3:7)\t\n',
         )
 
 
