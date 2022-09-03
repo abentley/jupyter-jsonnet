@@ -12,7 +12,7 @@ from ipykernel.kernelbase import Kernel
 from _jsonnet import evaluate_snippet
 
 
-class JupyterException(RuntimeError):
+class JupyterError(RuntimeError):
 
     def __init__(self, real):
         self._real = real
@@ -62,34 +62,19 @@ class JupyterException(RuntimeError):
             do_offset(14, column_offset)
         return ''.join(g for g in groups if g is not None)
 
-
-@dataclass
-class JupyterError:
-
-    exception: None
-    execution_count: None
-
-    @classmethod
-    def with_offsets(cls, error, kernel, row, column):
-        new_error = JupyterException.from_str(error.rewrite(-row, -column))
-        return cls(new_error, kernel.execution_count)
-
-    @property
-    def error_content(self):
-        return {
+    def to_jupyter(self, kernel, row, column):
+        new_error = JupyterError.from_str(self.rewrite(-row, -column))
+        error_content = {
             'ename': 'RuntimeError',
-            'evalue': str(self.exception),
-            'traceback': str(self.exception).splitlines()
+            'evalue': str(self),
+            'traceback': str(self).splitlines()
         }
-
-    def result(self):
         result = {
-            'execution_count': self.execution_count,
+            'execution_count': kernel.execution_count,
             'status': 'error',
         }
-        result.update(self.error_content)
-        return result
-
+        result.update(error_content)
+        return error_content, result
 
 
 class JupyterKernel(Kernel):
@@ -141,13 +126,14 @@ class JupyterKernel(Kernel):
         statements, result = self.split_code(new_code)
         if result is None:
             new_code += 'null'
-        with JupyterException.reraise():
+        with JupyterError.reraise():
             out = evaluate_snippet('', new_code)
         return out, statements, result
 
-    def send_error_response(self, error):
+    def send_error_response(self, error_content):
         self.send_response(self.iopub_socket, 'error',
-                           error.error_content)
+                           error_content)
+
     def do_execute(self, code, silent, store_history, user_expressions,
                    allow_stdin):
         try:
@@ -157,11 +143,11 @@ class JupyterKernel(Kernel):
                     output = ''
                 else:
                     raise ValueError('Bad input')
-        except JupyterException as e:
+        except JupyterError as e:
             row, column = self.get_current_offsets()
-            jp_err = JupyterError.with_offsets(e, self, row, column)
-            self.send_error_response(jp_err)
-            return jp_err.result()
+            error_content, result = e.to_jupyter(self, row, column)
+            self.send_error_response(error_content)
+            return result
         else:
             if not silent:
                 stream_content = {'name': 'stdout', 'text': output}
@@ -178,7 +164,7 @@ class JupyterKernel(Kernel):
         """Find current line/col offsets by forcing an error"""
         try:
             self.inner_execute("error 'foo'")
-        except JupyterException as e:
+        except JupyterError as e:
             groups = e.parse()
         else:
             raise AssertionError('inner_execute failed to raise an exception.')

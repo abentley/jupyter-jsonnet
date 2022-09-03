@@ -4,7 +4,7 @@ from unittest import (
 )
 
 from jupyter_jsonnet.kernel import (
-    JupyterException,
+    JupyterError,
     JupyterKernel,
 )
 
@@ -41,21 +41,21 @@ class TestJupyterKernel(TestCase):
         self.assertEqual(kernel.get_current_offsets(), (1, 0))
 
 
-class TestJupyterException(TestCase):
+class TestJupyterError(TestCase):
 
     def test_str(self):
         orig = RuntimeError('STATIC ERROR: 1:1: Unknown variable: y\n')
-        jupyter = JupyterException(orig)
+        jupyter = JupyterError(orig)
         self.assertEqual(str(jupyter), str(orig))
 
     def test_reraise(self):
         with self.assertRaisesRegex(
-                JupyterException, 'STATIC ERROR: 1:1: Unknown variable: y\n'):
-            with JupyterException.reraise():
+                JupyterError, 'STATIC ERROR: 1:1: Unknown variable: y\n'):
+            with JupyterError.reraise():
                 raise RuntimeError('STATIC ERROR: 1:1: Unknown variable: y\n')
 
     def test_parse(self):
-        result = JupyterException.from_str(
+        result = JupyterError.from_str(
             'RUNTIME ERROR: hunting the snark\n\tfoo.c:2:12-37\t\n'
         ).parse()
         self.assertEqual((
@@ -65,7 +65,7 @@ class TestJupyterException(TestCase):
         ), result.groups())
 
     def test_parse_syntax(self):
-        result = JupyterException.from_str(
+        result = JupyterError.from_str(
             'STATIC ERROR: 1:1: Unknown variable: y\n'
         ).parse()
         self.assertEqual((
@@ -75,7 +75,7 @@ class TestJupyterException(TestCase):
         ), result.groups())
 
     def test_parse_multiline(self):
-        result = JupyterException.from_str(
+        result = JupyterError.from_str(
             'RUNTIME ERROR: hello\nworld\n\t(1:1)-(2:7)\t\n'
         ).parse()
         self.assertEqual((
@@ -86,25 +86,25 @@ class TestJupyterException(TestCase):
 
     def test_rewrite(self):
         self.assertEqual(
-            JupyterException.from_str(
+            JupyterError.from_str(
                 'STATIC ERROR: 1:12: Unknown variable: y\n'
             ).rewrite(0, 0),
             'STATIC ERROR: 1:12: Unknown variable: y\n'
         )
         self.assertEqual(
-            JupyterException.from_str(
+            JupyterError.from_str(
                 'STATIC ERROR: 1:12: Unknown variable: y\n'
             ).rewrite(0, -9),
             'STATIC ERROR: 1:3: Unknown variable: y\n',
         )
         self.assertEqual(
-            JupyterException.from_str(
+            JupyterError.from_str(
                 'STATIC ERROR: 1:12-24: Unknown variable: y\n'
             ).rewrite(0, -9),
             'STATIC ERROR: 1:3-15: Unknown variable: y\n',
         )
         self.assertEqual(
-            JupyterException.from_str(
+            JupyterError.from_str(
                 'STATIC ERROR: 5:12-24: Unknown variable: y\n'
             ).rewrite(-3, -9),
             'STATIC ERROR: 2:3-15: Unknown variable: y\n',
@@ -112,7 +112,7 @@ class TestJupyterException(TestCase):
 
     def test_rewrite_multiline(self):
         self.assertEqual(
-            JupyterException.from_str(
+            JupyterError.from_str(
                 'RUNTIME ERROR: hello\nworld\n\t(5:10)-(6:7)\t\n'
             ).rewrite(-3, -9),
             'RUNTIME ERROR: hello\nworld\n\t(2:1)-(3:7)\t\n',
