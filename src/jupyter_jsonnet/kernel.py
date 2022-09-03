@@ -5,9 +5,11 @@
 from dataclasses import dataclass
 import json
 from importlib import metadata
+import re
 
 from ipykernel.kernelbase import Kernel
 from _jsonnet import evaluate_snippet
+
 
 @dataclass
 class JupyterError:
@@ -80,14 +82,36 @@ class JupyterKernel(Kernel):
         result = None if result.strip() == '' else result
         return statements, result
 
-    def do_execute(self, code, silent, store_history, user_expressions,
-                   allow_stdin):
+    @staticmethod
+    def parse_error(error):
+        return re.match(
+            r'^(?P<type>[^:]+)'
+            r'(: )(?:(?P<msg1>.*)(\n\t))?'
+            r'(?:([^:]+)(:))?(?P<start_row>\d+)(q)?(q)?(:)(?P<start_col>\d+)(-)?(\d+)?'
+            r'(: |\t?)(?:(?P<msg2>.+))?(\n)$',
+            error,
+        )
+
+    @classmethod
+    def rewrite_error(cls, error, row_offset, column_offset):
+        sections = cls.parse_error(error)
+        if sections == None:
+            return error
+        groups = list(sections.groups())
+        groups[10] = str(int(groups[10]) - column_offset)
+        return ''.join(g for g in groups if g is not None)
+
+    def inner_execute(self, code):
         new_code = self.history + code
         statements, result = self.split_code(new_code)
+        if result is None:
+            new_code += 'null'
+        return evaluate_snippet('', new_code), statements, result
+
+    def do_execute(self, code, silent, store_history, user_expressions,
+                   allow_stdin):
         try:
-            if result is None:
-                new_code += 'null'
-            output = evaluate_snippet('', new_code)
+            output, statements, result = self.inner_execute(code)
             if result is None:
                 if json.loads(output) is None:
                     output = ''
@@ -108,6 +132,22 @@ class JupyterKernel(Kernel):
                 'payload': [],
                 'user_expressions': {},
             }
+
+    def get_current_offsets(self):
+        """Find current line/col offsets by forcing an error"""
+        try:
+            self.inner_execute("error 'foo'")
+        except RuntimeError as e:
+            groups = self.parse_error(str(e))
+        else:
+            raise AssertionError('inner_execute failed to raise an exception.')
+        if groups is None or groups.group('type') != 'RUNTIME ERROR':
+            raise
+        if groups.group('msg1') != 'foo':
+            raise
+        row_offset = int(groups.group('start_row')) - 1
+        col_offset = int(groups.group('start_col')) - 1
+        return row_offset, col_offset
 
 
 if __name__ == '__main__':
