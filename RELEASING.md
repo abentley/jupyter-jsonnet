@@ -1,5 +1,6 @@
 # Releasing
 
+    oaf commit
     python3 -m build
     oaf tag 0.2
     git push --tags
