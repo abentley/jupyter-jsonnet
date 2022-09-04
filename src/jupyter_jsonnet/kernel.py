@@ -85,6 +85,7 @@ class JsonnetExecutor:
     def __init__(self, stdout_callback):
         self.stdout_callback = stdout_callback
         self.history = ''
+        self.import_paths = []
 
     @staticmethod
     def split_code(code):
@@ -105,7 +106,8 @@ class JsonnetExecutor:
         if result is None:
             new_code += 'null'
         try:
-            out = evaluate_snippet('', new_code)
+            out = evaluate_snippet('', new_code,
+                                   import_callback=self.jsonnet_import)
         except RuntimeError as e:
             raise JupyterError(e) from e
         if result is None:
@@ -114,6 +116,9 @@ class JsonnetExecutor:
             else:
                 raise ValueError('Bad input')
         return out, statements
+
+    def jsonnet_import(self, base, rel):
+        raise ValueError('Imports are not permitted.')
 
     def execute(self, code, silent):
         """Execute code
