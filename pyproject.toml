@@ -9,12 +9,12 @@ readme = "README.md"
 license = {text = 'MIT'}
 classifiers = [
     "Framework :: Jupyter",
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = ["ipykernel", "jsonnet", "jupyter_client", "notebook"]
-version = "0.3"
+version = "0.4"
 authors = [
     {email = "aaron@aaronbentley.com", name = "Aaron Bentley"},
 ]

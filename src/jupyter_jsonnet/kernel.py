@@ -10,7 +10,21 @@ from ipykernel.kernelbase import Kernel
 from _jsonnet import evaluate_snippet
 
 
-class JupyterError(RuntimeError):
+def error_to_jupyter(error, execution_count):
+    error_content = {
+        'ename': 'RuntimeError',
+        'evalue': error,
+        'traceback': error.splitlines()
+    }
+    result = {
+        'execution_count': execution_count,
+        'status': 'error',
+    }
+    result.update(error_content)
+    return error_content, result
+
+
+class JsonnetError(RuntimeError):
 
     def __init__(self, real):
         self._real = real
@@ -60,20 +74,11 @@ class JupyterError(RuntimeError):
 
     def with_offsets(self, row, column):
         """Return a version of this error with the row_colmn text adjusted."""
-        return JupyterError.from_str(self.rewrite(row, column))
+        return JsonnetError.from_str(self.rewrite(row, column))
 
-    def to_jupyter(self, kernel):
-        error_content = {
-            'ename': 'RuntimeError',
-            'evalue': str(self),
-            'traceback': str(self).splitlines()
-        }
-        result = {
-            'execution_count': kernel.execution_count,
-            'status': 'error',
-        }
-        result.update(error_content)
-        return error_content, result
+
+class ExecutorInputError(ValueError):
+    """Raised when the executor finds an input error."""
 
 
 class JsonnetExecutor:
@@ -99,22 +104,50 @@ class JsonnetExecutor:
         result = None if result.strip() == '' else result
         return statements, result
 
+    def _evaluate_snippet(self, code):
+        """Evaluate the supplied code.
+
+        No history is considered.
+        :raises: JsonnetError if the underlying code raises RuntimeError.
+        """
+        try:
+            return evaluate_snippet('', code,
+                                    import_callback=self.jsonnet_import)
+        except RuntimeError as e:
+            raise JsonnetError(e) from e
+
+    def _jsonnet_type(self, code):
+        """Evaluate the jsonnet type (not python type) of code.
+
+        No history is considered (it must be already added).
+        """
+        new_code = "std.type(\n{}\n)".format(code)
+        out = self._evaluate_snippet(new_code)
+        return json.loads(out)
+
     def _execute(self, code):
-        """Execute method that does not update history or write output."""
+        """Execute method that does not update history or write output.
+
+        :raises: JsonnetError on error.
+        """
         new_code = self.history + code
         statements, result = self.split_code(new_code)
         if result is None:
             new_code += 'null'
-        try:
-            out = evaluate_snippet('', new_code,
-                                   import_callback=self.jsonnet_import)
-        except RuntimeError as e:
-            raise JupyterError(e) from e
+        out = self._evaluate_snippet(new_code)
         if result is None:
             if json.loads(out) is None:
                 out = ''
             else:
                 raise ValueError('Bad input')
+        elif code.startswith('//jupyter: string'):
+            out = json.loads(out)
+            if not isinstance(out, str):
+                raise ExecutorInputError(
+                    'Cannot output as raw string: value type is {}.'.format(
+                        self._jsonnet_type(new_code)
+                    )
+                )
         return out, statements
 
     def jsonnet_import(self, base, rel):
@@ -130,7 +163,7 @@ class JsonnetExecutor:
         """
         try:
             out, statements = self._execute(code)
-        except JupyterError as e:
+        except JsonnetError as e:
             row, column = self.get_current_offsets()
             raise e.with_offsets(-row, -column) from e
         if not silent:
@@ -141,7 +174,7 @@ class JsonnetExecutor:
         """Find current line/col offsets by forcing an error"""
         try:
             self._execute("error 'foo'")
-        except JupyterError as e:
+        except JsonnetError as e:
             groups, _ = e.parse()
         else:
             raise AssertionError('execute failed to raise an exception.')
@@ -158,7 +191,7 @@ class JupyterKernel(Kernel):
 
     implementation = "jupyter-jsonnet"
 
-    implementation_version = "0.3"
+    implementation_version = "0.4"
 
     language = "Jsonnet"
 
@@ -204,10 +237,12 @@ class JupyterKernel(Kernel):
         """Execute the supplied code and communicate the outcome."""
         try:
             self.executor.execute(code, silent)
-        except JupyterError as e:
-            error_content, result = e.to_jupyter(self)
-            self.send_response(self.iopub_socket, 'error',
-                               error_content)
+        except (JsonnetError, ExecutorInputError) as e:
+            error_content, result = error_to_jupyter(
+                str(e),
+                self.execution_count
+            )
+            self.send_response(self.iopub_socket, 'error', error_content)
             return result
         return {
             'status': 'ok',

@@ -15,6 +15,9 @@ This kernel extends jsonnet syntax slightly to permit
   for errrors).
 * Definitions (statements) from previous cells to carry over, even if the cell
   containing the definition produced a result.
+* Using `//jupyter: string` as the first line of a cell causes the output to be
+  the raw string instead of the json-escaped version, similarly to `--string`
+  at the CLI.  For use with e.g. `std.manifestTomlEx()`
 
 The parsing to separate statements from expressions is very simple, and can
 easily be fooled by semicolons that do not terminate statements, like in
