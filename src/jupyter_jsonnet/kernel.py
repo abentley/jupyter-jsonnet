@@ -1,10 +1,11 @@
-# Copyright Aaron Bentley 2022
+# Copyright Aaron Bentley 2022 / Nicolas Hans 2023
 # This software is licenced under the MIT license
 # <LICENSE or http://opensource.org/licenses/MIT>
 
 import json
 from importlib import metadata
 import re
+import os
 
 from ipykernel.kernelbase import Kernel
 from _jsonnet import evaluate_snippet
@@ -150,8 +151,28 @@ class JsonnetExecutor:
                 )
         return out, statements
 
-    def jsonnet_import(self, base, rel):
-        raise ValueError('Imports are not permitted.')
+    #  based on https://stackoverflow.com/a/49954607
+    #  Returns content if worked, None if file not found, or throws an exception
+    def try_path(self, dir, rel):
+        if not rel:
+            raise RuntimeError('Got invalid filename (empty string).')
+        if rel[0] == '/':
+            full_path = rel
+        else:
+            full_path = dir + rel
+        if full_path[-1] == '/':
+            raise RuntimeError('Attempted to import a directory')
+
+        if not os.path.isfile(full_path):
+            return full_path, None
+        with open(full_path, 'rb') as f:
+            return full_path, f.read()
+
+    def jsonnet_import(self, dir, rel):
+        full_path, content = self.try_path(dir, rel)
+        if content:
+            return full_path, content
+        raise RuntimeError('File not found')
 
     def execute(self, code, silent):
         """Execute code
